@@ -1,0 +1,1 @@
+from shared_backend.domain.user_identity import normalize_user_pseudo
