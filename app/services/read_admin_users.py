@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.clients.database.identity_database_client import UserRecord
 from app.clients.database import identity_database_client
-from app.schemas.admin.admin_user_schema import AdminUserListRead, AdminUserRead
-from app.schemas.auth.auth_schema import UserRole
+
+from shared_backend.schemas.admin.admin_user_schema import AdminUserListRead, AdminUserRead
+from shared_backend.schemas.auth.auth_schema import UserRole
 
 
 def read_admin_users(

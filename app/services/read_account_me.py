@@ -7,8 +7,9 @@ from app.domain.current_user import (
     AuthenticatedUserContext,
     build_authenticated_user_read,
 )
-from app.errors.custom_exceptions import UserNotFoundError
-from app.schemas.account.account_schema import AccountMeRead
+from shared_backend.errors.custom_exceptions import UserNotFoundError
+
+from shared_backend.schemas.account.account_schema import AccountMeRead
 
 
 def read_account_me(

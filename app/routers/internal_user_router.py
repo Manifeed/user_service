@@ -4,28 +4,8 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_identity_db_session
-from app.schemas.account.account_schema import (
-    AccountMeRead,
-    AccountPasswordUpdateRead,
-    AccountProfileUpdateRead,
-    UserApiKeyCreateRead,
-    UserApiKeyDeleteRead,
-    UserApiKeyListRead,
-)
-from app.schemas.admin.admin_user_schema import (
-    AdminUserListRead,
-    AdminUserRead,
-    AdminUserUpdateRequestSchema,
-)
-from app.schemas.auth.auth_schema import UserRole
 from app.domain.current_user import AuthenticatedUserContext
-from app.schemas.internal.user_service_schema import (
-    InternalAccountPasswordUpdateRequest,
-    InternalAccountProfileUpdateRequest,
-    InternalApiKeyCreateRequest,
-    InternalCurrentUserPayload,
-)
-from app.security import require_internal_service_token
+from shared_backend.security.internal_service_auth import require_internal_service_token
 from app.services.account_api_key_service import (
     create_account_api_key,
     delete_account_api_key,
@@ -36,6 +16,27 @@ from app.services.read_admin_users import read_admin_users
 from app.services.update_account_password import update_account_password
 from app.services.update_account_profile import update_account_profile
 from app.services.update_admin_user import update_admin_user
+
+from shared_backend.schemas.account.account_schema import (
+    AccountMeRead,
+    AccountPasswordUpdateRead,
+    AccountProfileUpdateRead,
+    UserApiKeyCreateRead,
+    UserApiKeyDeleteRead,
+    UserApiKeyListRead,
+)
+from shared_backend.schemas.admin.admin_user_schema import (
+    AdminUserListRead,
+    AdminUserRead,
+    AdminUserUpdateRequestSchema,
+)
+from shared_backend.schemas.auth.auth_schema import UserRole
+from shared_backend.schemas.internal.user_service_schema import (
+    InternalAccountPasswordUpdateRequest,
+    InternalAccountProfileUpdateRequest,
+    InternalApiKeyCreateRequest,
+    InternalCurrentUserPayload,
+)
 
 
 internal_user_router = APIRouter(

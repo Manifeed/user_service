@@ -6,24 +6,25 @@ from sqlalchemy.orm import Session
 from app.clients.database.identity_database_client import UserApiKeyRecord
 from app.clients.database import identity_database_client
 from app.domain.current_user import AuthenticatedUserContext
-from app.errors.custom_exceptions import (
+from shared_backend.errors.custom_exceptions import (
     ApiAccessDisabledError,
     ApiKeyAllocationError,
     ApiKeyNotFoundError,
     UserNotFoundError,
-)
-from app.schemas.account.account_schema import (
-    UserApiKeyCreateRead,
-    UserApiKeyCreateRequestSchema,
-    UserApiKeyDeleteRead,
-    UserApiKeyListRead,
-    UserApiKeyRead,
 )
 from app.domain.worker_identity import build_worker_name
 from app.utils.auth_utils import (
     build_key_prefix,
     generate_api_key,
     hash_secret_token,
+)
+
+from shared_backend.schemas.account.account_schema import (
+    UserApiKeyCreateRead,
+    UserApiKeyCreateRequestSchema,
+    UserApiKeyDeleteRead,
+    UserApiKeyListRead,
+    UserApiKeyRead,
 )
 
 MAX_API_KEY_CREATION_RETRIES = 3

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.errors.exception_handlers import register_exception_handlers
-from app.schemas.internal.service_schema import InternalServiceHealthRead
+from shared_backend.errors.exception_handlers import register_exception_handlers
+from shared_backend.schemas.internal.service_schema import InternalServiceHealthRead
 from app.routers.internal_user_router import internal_user_router
 
 

@@ -9,9 +9,10 @@ from app.domain.current_user import (
     AuthenticatedUserContext,
     build_authenticated_user_read,
 )
-from app.errors.app_error import ConflictError
-from app.errors.custom_exceptions import InvalidPseudoError, UserNotFoundError
-from app.schemas.account.account_schema import (
+from shared_backend.errors.app_error import ConflictError
+from shared_backend.errors.custom_exceptions import InvalidPseudoError, UserNotFoundError
+
+from shared_backend.schemas.account.account_schema import (
     AccountProfileUpdateRead,
     AccountProfileUpdateRequestSchema,
 )

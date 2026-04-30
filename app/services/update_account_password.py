@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 from app.clients.database import identity_database_client
 from app.domain.password_policy import validate_password_policy
 from app.domain.current_user import AuthenticatedUserContext
-from app.errors.custom_exceptions import InvalidCredentialsError, UserNotFoundError
-from app.schemas.account.account_schema import (
+from shared_backend.errors.custom_exceptions import InvalidCredentialsError, UserNotFoundError
+from app.utils.auth_utils import hash_password, verify_password
+
+from shared_backend.schemas.account.account_schema import (
     AccountPasswordUpdateRead,
     AccountPasswordUpdateRequestSchema,
 )
-from app.utils.auth_utils import hash_password, verify_password
 
 
 def update_account_password(

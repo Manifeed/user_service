@@ -3,9 +3,10 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.clients.database import identity_database_client
-from app.errors.custom_exceptions import UserNotFoundError
-from app.schemas.admin.admin_user_schema import AdminUserRead, AdminUserUpdateRequestSchema
+from shared_backend.errors.custom_exceptions import UserNotFoundError
 from app.services.read_admin_users import build_admin_user_read
+
+from shared_backend.schemas.admin.admin_user_schema import AdminUserRead, AdminUserUpdateRequestSchema
 
 
 def update_admin_user(
