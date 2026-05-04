@@ -3,11 +3,11 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.clients.database import identity_database_client
-from app.domain.current_user import AuthenticatedUserContext
-from shared_backend.domain.password_policy import validate_password_policy
-from shared_backend.errors.custom_exceptions import InvalidCredentialsError, UserNotFoundError
 from app.utils.auth_utils import hash_password, verify_password
 
+from shared_backend.domain.current_user import AuthenticatedUserContext
+from shared_backend.domain.password_policy import validate_password_policy
+from shared_backend.errors.custom_exceptions import InvalidCredentialsError, UserNotFoundError
 from shared_backend.schemas.account.account_schema import (
     AccountPasswordUpdateRead,
     AccountPasswordUpdateRequestSchema,

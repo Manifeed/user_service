@@ -6,31 +6,44 @@ from typing import Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
-DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "40"))
-DB_POOL_TIMEOUT_SECONDS = int(os.getenv("DB_POOL_TIMEOUT_SECONDS", "30"))
-DB_POOL_RECYCLE_SECONDS = int(os.getenv("DB_POOL_RECYCLE_SECONDS", "1800"))
+DEFAULT_DB_POOL_SIZE = 20
+DEFAULT_DB_MAX_OVERFLOW = 40
+DEFAULT_DB_POOL_TIMEOUT_SECONDS = 30
+DEFAULT_DB_POOL_RECYCLE_SECONDS = 1800
 
-DEFAULT_IDENTITY_DATABASE_URL = "postgresql://manifeed:manifeed@localhost:5432/manifeed_identity"
 
+def _read_int_env(name: str, default: int, *, minimum: int | None = None) -> int:
+    raw_value = os.getenv(name, str(default)).strip()
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    if minimum is not None and parsed < minimum:
+        return default
+    return parsed
+
+
+DB_POOL_SIZE = _read_int_env("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE, minimum=1)
+DB_MAX_OVERFLOW = _read_int_env("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW, minimum=0)
+DB_POOL_TIMEOUT_SECONDS = _read_int_env(
+    "DB_POOL_TIMEOUT_SECONDS",
+    DEFAULT_DB_POOL_TIMEOUT_SECONDS,
+    minimum=1,
+)
+DB_POOL_RECYCLE_SECONDS = _read_int_env(
+    "DB_POOL_RECYCLE_SECONDS",
+    DEFAULT_DB_POOL_RECYCLE_SECONDS,
+    minimum=1,
+)
 
 def _resolve_database_url() -> str:
     database_url = os.getenv("IDENTITY_DATABASE_URL")
-    if not database_url:
-        if _requires_explicit_database_url():
-            raise RuntimeError("IDENTITY_DATABASE_URL must be configured outside local/test environments")
-        database_url = DEFAULT_IDENTITY_DATABASE_URL
+    if not database_url or not database_url.strip():
+        raise RuntimeError("IDENTITY_DATABASE_URL must be configured")
+    database_url = database_url.strip()
     if database_url.startswith("postgresql://") and "+psycopg" not in database_url:
         return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
     return database_url
-
-
-def _requires_explicit_database_url() -> bool:
-    raw_value = os.getenv("REQUIRE_EXPLICIT_DATABASE_URLS")
-    if raw_value is not None:
-        return raw_value.strip().lower() in {"1", "true", "yes", "on"}
-    environment = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "")).strip().lower()
-    return environment in {"prod", "production", "staging"}
 
 
 def _create_engine(database_url: str):

@@ -7,12 +7,30 @@ from fastapi.testclient import TestClient
 
 import app.routers.internal_user_router as router_module
 
-from app.domain.current_user import AuthenticatedUserContext
+from shared_backend.domain.current_user import AuthenticatedUserContext
+from shared_backend.errors.custom_exceptions import AdminAccessRequiredError
 from shared_backend.errors.custom_exceptions import InvalidSessionTokenError
 from shared_backend.errors.exception_handlers import register_exception_handlers
 from shared_backend.schemas.account.account_schema import AccountMeRead, UserApiKeyListRead
 from shared_backend.schemas.admin.admin_user_schema import AdminUserListRead, AdminUserRead
 from shared_backend.schemas.auth.auth_schema import AuthenticatedUserRead
+def _session_headers() -> dict[str, str]:
+    return {
+        router_module.INTERNAL_SESSION_TOKEN_HEADER: "msess_example",
+    }
+
+
+def _admin_headers(*, role: str = "admin") -> dict[str, str]:
+    return {
+        router_module.INTERNAL_CURRENT_USER_ID_HEADER: "2",
+        router_module.INTERNAL_CURRENT_USER_EMAIL_HEADER: "admin@example.com",
+        router_module.INTERNAL_CURRENT_USER_ROLE_HEADER: role,
+        router_module.INTERNAL_CURRENT_USER_IS_ACTIVE_HEADER: "true",
+        router_module.INTERNAL_CURRENT_USER_API_ACCESS_ENABLED_HEADER: "true",
+        router_module.INTERNAL_CURRENT_USER_SESSION_EXPIRES_AT_HEADER: datetime.now(timezone.utc).isoformat(),
+    }
+
+
 
 
 def _user_read(*, role: str = "user") -> AuthenticatedUserRead:
@@ -68,7 +86,16 @@ def _build_client(monkeypatch) -> TestClient:
     monkeypatch.setattr(
         router_module,
         "read_admin_users",
-        lambda db, **kwargs: AdminUserListRead(items=[], total=0, active_total=0, limit=100, offset=0),
+        lambda db, **kwargs: (
+            (_ for _ in ()).throw(AdminAccessRequiredError())
+            if kwargs["current_user"].role != "admin"
+            else AdminUserListRead(items=[], total=0, active_total=0, limit=100, offset=0)
+        ),
+    )
+    monkeypatch.setattr(
+        router_module,
+        "delete_account_api_key",
+        lambda db, api_key_id, *, current_user: type("DeleteResponse", (), {"ok": True})(),
     )
     monkeypatch.setattr(
         router_module,
@@ -87,29 +114,29 @@ def _build_client(monkeypatch) -> TestClient:
     return TestClient(app)
 
 
-def test_internal_account_routes_reject_flat_json_bodies(monkeypatch) -> None:
+def test_internal_account_api_key_routes_require_session_header(monkeypatch) -> None:
     client = _build_client(monkeypatch)
 
     requests = [
-        ("POST", "/internal/users/account/me", {"session_token": "msess_example"}),
-        ("POST", "/internal/users/account/api-keys/list", {"session_token": "msess_example"}),
+        ("GET", "/internal/users/account/api-keys"),
+        ("DELETE", "/internal/users/account/api-keys/1"),
     ]
 
-    for method, path, body in requests:
-        response = client.request(method, path, json=body)
+    for method, path in requests:
+        response = client.request(method, path)
         assert response.status_code == 422, path
 
 
-def test_internal_account_routes_accept_wrapped_session_payloads(monkeypatch) -> None:
+def test_internal_account_api_key_routes_accept_session_header(monkeypatch) -> None:
     client = _build_client(monkeypatch)
 
     requests = [
-        ("POST", "/internal/users/account/me", {"payload": {"session_token": "msess_example"}}),
-        ("POST", "/internal/users/account/api-keys/list", {"payload": {"session_token": "msess_example"}}),
+        ("GET", "/internal/users/account/api-keys"),
+        ("DELETE", "/internal/users/account/api-keys/1"),
     ]
 
-    for method, path, body in requests:
-        response = client.request(method, path, json=body)
+    for method, path in requests:
+        response = client.request(method, path, headers=_session_headers())
         assert response.status_code == 200, path
 
 
@@ -133,21 +160,9 @@ def test_internal_account_routes_surface_invalid_session_errors(monkeypatch) -> 
 def test_internal_admin_routes_reject_non_admin_users(monkeypatch) -> None:
     client = _build_client(monkeypatch)
 
-    response = client.post(
-        "/internal/users/admin/users/list",
-        json={
-            "payload": {
-                "current_user": {
-                    "user_id": 1,
-                    "email": "user@example.com",
-                    "role": "user",
-                    "is_active": True,
-                    "api_access_enabled": True,
-                    "session_expires_at": datetime.now(timezone.utc).isoformat(),
-                },
-                "filters": {},
-            }
-        },
+    response = client.get(
+        "/internal/users/admin/users",
+        headers=_admin_headers(role="user"),
     )
 
     assert response.status_code == 403
@@ -156,7 +171,6 @@ def test_internal_admin_routes_reject_non_admin_users(monkeypatch) -> None:
 
 def test_internal_admin_routes_accept_wrapped_admin_payloads(monkeypatch) -> None:
     client = _build_client(monkeypatch)
-
     admin_payload = {
         "current_user": {
             "user_id": 2,
@@ -168,9 +182,9 @@ def test_internal_admin_routes_accept_wrapped_admin_payloads(monkeypatch) -> Non
         }
     }
 
-    list_response = client.post(
-        "/internal/users/admin/users/list",
-        json={"payload": {**admin_payload, "filters": {"limit": 10, "offset": 0}}},
+    list_response = client.get(
+        "/internal/users/admin/users?limit=10&offset=0",
+        headers=_admin_headers(),
     )
     update_response = client.patch(
         "/internal/users/admin/users/3",

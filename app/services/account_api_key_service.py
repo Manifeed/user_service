@@ -5,7 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.clients.database.identity_database_client import UserApiKeyRecord
 from app.clients.database import identity_database_client
-from app.domain.current_user import AuthenticatedUserContext
+from app.utils.auth_utils import (
+    build_key_prefix,
+    generate_api_key,
+    hash_secret_token,
+)
+
+from shared_backend.domain.current_user import AuthenticatedUserContext
 from shared_backend.domain.worker_identity import build_worker_name
 from shared_backend.errors.custom_exceptions import (
     ApiAccessDisabledError,
@@ -13,12 +19,6 @@ from shared_backend.errors.custom_exceptions import (
     ApiKeyNotFoundError,
     UserNotFoundError,
 )
-from app.utils.auth_utils import (
-    build_key_prefix,
-    generate_api_key,
-    hash_secret_token,
-)
-
 from shared_backend.schemas.account.account_schema import (
     UserApiKeyCreateRead,
     UserApiKeyCreateRequestSchema,

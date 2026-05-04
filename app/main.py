@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.clients.networking.auth_service_networking_client import get_required_auth_service_client
 from app.database import check_identity_database_ready
+from app.routers.internal_user_router import internal_user_router
+
+from shared_backend.clients.auth_service_networking_client import get_required_auth_service_client
 from shared_backend.errors.exception_handlers import register_exception_handlers
 from shared_backend.security.internal_service_auth import validate_internal_service_token_configuration
 from shared_backend.schemas.internal.service_schema import InternalServiceHealthRead
-from app.routers.internal_user_router import internal_user_router
 from shared_backend.utils.logging_utils import (
     configure_service_logging,
     create_request_logging_middleware,
