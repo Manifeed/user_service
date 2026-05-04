@@ -1,1 +1,0 @@
-from shared_backend.domain.worker_identity import build_worker_name

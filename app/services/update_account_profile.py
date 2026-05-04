@@ -4,13 +4,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.clients.database import identity_database_client
-from app.domain.user_identity import normalize_user_pseudo
 from app.domain.current_user import (
     AuthenticatedUserContext,
     build_authenticated_user_read,
 )
 from shared_backend.errors.app_error import ConflictError
 from shared_backend.errors.custom_exceptions import InvalidPseudoError, UserNotFoundError
+from shared_backend.domain.user_identity import normalize_user_pseudo
 
 from shared_backend.schemas.account.account_schema import (
     AccountProfileUpdateRead,

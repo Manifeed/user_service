@@ -3,6 +3,8 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.clients.database import identity_database_client
+from app.domain.current_user import AuthenticatedUserContext
+from app.services.current_user_context_service import ensure_admin_user
 from shared_backend.errors.custom_exceptions import UserNotFoundError
 from app.services.read_admin_users import build_admin_user_read
 
@@ -14,8 +16,10 @@ def update_admin_user(
     user_id: int,
     payload: AdminUserUpdateRequestSchema,
     *,
+    current_user: AuthenticatedUserContext,
     commit: bool = True,
 ) -> AdminUserRead:
+    ensure_admin_user(current_user)
     existing_user = identity_database_client.get_user_by_id(db, user_id=user_id)
     if existing_user is None:
         raise UserNotFoundError()

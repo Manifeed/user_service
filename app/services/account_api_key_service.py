@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 from app.clients.database.identity_database_client import UserApiKeyRecord
 from app.clients.database import identity_database_client
 from app.domain.current_user import AuthenticatedUserContext
+from shared_backend.domain.worker_identity import build_worker_name
 from shared_backend.errors.custom_exceptions import (
     ApiAccessDisabledError,
     ApiKeyAllocationError,
     ApiKeyNotFoundError,
     UserNotFoundError,
 )
-from app.domain.worker_identity import build_worker_name
 from app.utils.auth_utils import (
     build_key_prefix,
     generate_api_key,
@@ -64,22 +64,22 @@ def create_account_api_key(
         raise UserNotFoundError()
 
     api_key = generate_api_key()
+    normalized_label = payload.label.strip()
     api_key_record = None
     for _ in range(MAX_API_KEY_CREATION_RETRIES):
         try:
-            api_key_record = identity_database_client.create_user_api_key(
-                db,
-                user_id=current_user.user_id,
-                label=payload.label.strip(),
-                worker_type=payload.worker_type,
-                key_prefix=build_key_prefix(api_key),
-                key_hash=hash_secret_token(api_key),
-            )
-            if commit:
-                db.commit()
-            break
+            with db.begin_nested():
+                api_key_record = identity_database_client.create_user_api_key(
+                    db,
+                    user_id=current_user.user_id,
+                    label=normalized_label,
+                    worker_type=payload.worker_type,
+                    key_prefix=build_key_prefix(api_key),
+                    key_hash=hash_secret_token(api_key),
+                )
+                db.flush()
+                break
         except IntegrityError:
-            db.rollback()
             continue
         except Exception:
             if commit:
@@ -87,7 +87,12 @@ def create_account_api_key(
             raise
 
     if api_key_record is None:
+        if commit:
+            db.rollback()
         raise ApiKeyAllocationError()
+
+    if commit:
+        db.commit()
 
     return UserApiKeyCreateRead(
         api_key=api_key,
@@ -118,6 +123,7 @@ def delete_account_api_key(
         if commit:
             db.rollback()
         raise
+
     return UserApiKeyDeleteRead(ok=True)
 
 

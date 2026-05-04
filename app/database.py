@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
@@ -59,3 +59,8 @@ def get_identity_db_session() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def check_identity_database_ready() -> None:
+    with IdentitySessionLocal() as db:
+        db.execute(text("SELECT 1")).scalar_one()
