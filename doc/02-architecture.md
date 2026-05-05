@@ -12,7 +12,7 @@
   - HTTP-only layer for `/internal/users/*`
   - request body validation
   - DB session injection
-  - account session resolution
+  - current-user context validation for account/admin calls
 
 - `app/services/*`
   - transport-agnostic business logic
@@ -20,7 +20,6 @@
   - admin listing/update use cases
 
 - `app/services/current_user_context_service.py`
-  - resolves `session_token` through `auth_service`
   - enforces local admin role checks
 
 - `app/clients/database/identity_database_client.py`
@@ -28,17 +27,13 @@
   - user lookup/update
   - API key listing/insert/revocation
 
-- `app/clients/networking/auth_service_networking_client.py`
-  - internal HTTP client to `auth_service`
-  - currently used for `resolve-session`
-
 ## Runtime Collaboration
 
 ### Account flows
 
-1. caller sends internal token + wrapped `payload.session_token`
-2. router resolves the session via `auth_service`
-3. service layer uses the resolved `AuthenticatedUserContext`
+1. `public_api` resolves the browser session through `auth_service`
+2. caller sends internal token + resolved current-user context
+3. router validates active/API-access requirements for the route
 4. DB client reads or mutates identity data
 5. router returns shared response schemas
 

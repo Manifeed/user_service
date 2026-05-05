@@ -8,31 +8,30 @@ Header used for internal authorization:
 
 Policy:
 
-- local/test-like environments may allow missing token when not configured
-- `REQUIRE_INTERNAL_SERVICE_TOKEN=true` forces strict mode even in local-like environments
-- strict environments require configured token
-- strict environments accept either one `INTERNAL_SERVICE_TOKEN` or a comma-separated `INTERNAL_SERVICE_TOKENS` set
-- weak tokens are rejected in strict mode
+- the service fails startup when no token is configured
+- accepted tokens come from `INTERNAL_SERVICE_TOKEN` or comma-separated `INTERNAL_SERVICE_TOKENS`
+- weak tokens are rejected
 - token comparison uses constant-time `secrets.compare_digest`
 - `/internal/health` and `/internal/ready` stay unauthenticated for orchestration probes
 
 ## Account Trust Boundary
 
-Account routes no longer trust caller-supplied user identity.
+Account routes trust only service-authenticated callers and the current-user
+context produced by `public_api` after session resolution.
 
 Current behavior:
 
-- caller sends only `session_token`
-- `user_service` resolves that token through `auth_service`
-- the returned authenticated context becomes the only source of truth for:
+- `public_api` resolves the browser session through `auth_service`
+- caller sends internal token plus the resolved authenticated context
+- the authenticated context becomes the source of truth for:
   - `user_id`
   - `role`
   - `is_active`
   - `api_access_enabled`
   - `session_expires_at`
 
-This closes the earlier trust flaw where an internal caller could forge
-account identity fields directly.
+This removes the duplicated `user_service -> auth_service` lookup on account
+routes while keeping the public session proof at the gateway boundary.
 
 ## Admin Trust Boundary
 
@@ -65,4 +64,4 @@ Important nuance:
 
 - inter-service auth still uses shared header secrets rather than mTLS or signed service identity
 - admin routes still trust upstream caller identity payloads rather than resolving a session directly
-- session-token hashing for API keys uses plain SHA-256 without an extra pepper
+- API-key hashing uses plain SHA-256 without an extra pepper

@@ -15,7 +15,7 @@ clients directly.
 - List, create, and revoke per-user API keys
 - List users for admin backoffice workflows
 - Update admin-managed flags (`is_active`, `api_access_enabled`)
-- Revalidate account flows end-to-end through `auth_service`
+- Consume account current-user context resolved by `public_api`
 - Enforce internal token gate (`x-manifeed-internal-token`) on all user routes
 - Expose health and readiness probes for orchestration
 
@@ -23,9 +23,8 @@ clients directly.
 
 - `app/routers`: HTTP route layer under `/internal/users/*`
 - `app/services`: transport-agnostic business use cases
-- `app/services/current_user_context_service.py`: session resolution and admin guard helpers
+- `app/services/current_user_context_service.py`: admin guard helpers
 - `app/clients/database`: SQLAlchemy session and SQL access layer
-- `app/clients/networking/auth_service_networking_client.py`: internal `auth_service` client
 - `shared_backend.security.internal_service_auth`: shared inter-service token validation helpers
 - `shared_backend.errors.exception_handlers`: shared JSON error mapping
 - `shared_backend.utils.logging_utils`: shared request logging middleware
@@ -43,7 +42,7 @@ python3 -m pip install -r requirements.txt
 ```bash
 export APP_ENV=local
 export IDENTITY_DATABASE_URL=postgresql://manifeed:manifeed@localhost:5432/manifeed_identity
-export AUTH_SERVICE_URL=http://localhost:8001
+export INTERNAL_SERVICE_TOKEN=replace-with-strong-secret-min-32-chars
 ```
 
 ### 3) Run the API
@@ -59,34 +58,39 @@ Service endpoints:
 - `POST /internal/users/account/me`
 - `PATCH /internal/users/account/me`
 - `PATCH /internal/users/account/password`
-- `POST /internal/users/account/api-keys/list`
+- `GET /internal/users/account/api-keys`
 - `POST /internal/users/account/api-keys`
-- `POST /internal/users/account/api-keys/{api_key_id}/delete`
-- `POST /internal/users/admin/users/list`
+- `DELETE /internal/users/account/api-keys/{api_key_id}`
+- `GET /internal/users/admin/users`
 - `PATCH /internal/users/admin/users/{user_id}`
 
-All internal user endpoints use a JSON body wrapped under `payload`. Account
-flows now carry a `session_token` and are revalidated against `auth_service`
-before reading or mutating account state.
+Body-carrying internal user endpoints use a JSON body wrapped under `payload`.
+Account flows carry a current-user context resolved by `public_api`.
 
 Example:
 
 ```json
 {
   "payload": {
-    "session_token": "msess_example"
+    "current_user": {
+      "user_id": 1,
+      "email": "user@example.com",
+      "role": "user",
+      "is_active": true,
+      "api_access_enabled": true,
+      "session_expires_at": "2026-05-04T12:00:00Z"
+    }
   }
 }
 ```
 
 ## Security Model
 
-- All `/internal/users/*` routes require `x-manifeed-internal-token` except in
-  explicit local/test environments without configured token.
+- All `/internal/users/*` routes require `x-manifeed-internal-token`.
 - Incoming internal auth can validate either one `INTERNAL_SERVICE_TOKEN` or
   multiple accepted secrets via `INTERNAL_SERVICE_TOKENS`.
-- Account endpoints no longer trust caller-supplied user context. They resolve
-  the session token through `auth_service /internal/auth/resolve-session`.
+- Account endpoints trust only the service-authenticated `public_api` caller and
+  the current-user context it sends after resolving the browser session.
 - Admin endpoints require an explicit `current_user` payload and recheck that
   `role == "admin"` inside `user_service`.
 - `/internal/health` and `/internal/ready` stay unauthenticated for probes;
@@ -105,11 +109,8 @@ Example:
 - `APP_ENV` / `ENVIRONMENT`: environment mode resolver
 - `IDENTITY_DATABASE_URL`: identity Postgres DSN
 - `REQUIRE_EXPLICIT_DATABASE_URLS`: requires explicit DB URL in strict envs
-- `AUTH_SERVICE_URL`: internal base URL for `auth_service`
-- `AUTH_SERVICE_TIMEOUT_SECONDS`: timeout for session revalidation calls
 - `INTERNAL_SERVICE_TOKEN`: shared secret for internal route protection
 - `INTERNAL_SERVICE_TOKENS`: optional comma-separated accepted ingress tokens
-- `REQUIRE_INTERNAL_SERVICE_TOKEN`: force strict internal token mode
 
 ### DB pool tuning
 
@@ -140,7 +141,7 @@ Current tests cover:
 Current gaps before strong production confidence:
 
 - No real DB integration tests for account/profile/password/API-key flows
-- No end-to-end contract test that exercises `public_api -> user_service -> auth_service` with real containers in CI
+- No end-to-end contract test that exercises `public_api -> user_service` with real containers in CI
 
 ## Docker
 
@@ -156,7 +157,6 @@ Run:
 docker run --rm -p 8000:8000 \
 	-e APP_ENV=production \
 	-e IDENTITY_DATABASE_URL='postgresql://user:pass@host:5432/db' \
-	-e AUTH_SERVICE_URL='http://auth-service:8000' \
 	-e INTERNAL_SERVICE_TOKEN='replace-with-strong-secret-min-32-chars' \
 	manifeed-user-service
 ```

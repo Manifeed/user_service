@@ -31,7 +31,6 @@ Validates:
 
 - internal token configuration
 - identity database connectivity (`SELECT 1`)
-- presence of `AUTH_SERVICE_URL` through the internal auth client bootstrap
 
 Response:
 
@@ -55,22 +54,25 @@ Request:
 ```json
 {
 	"payload": {
-		"session_token": "msess_example"
+		"current_user": {
+			"user_id": 1,
+			"email": "user@example.com",
+			"role": "user",
+			"is_active": true,
+			"api_access_enabled": true,
+			"session_expires_at": "2026-05-04T12:00:00Z"
+		}
 	}
 }
 ```
 
 Behavior:
 
-- resolves session via `auth_service`
 - reloads user from identity DB by `user_id`
 - returns shared authenticated user projection
 
 Common error codes:
 
-- `missing_session_token`
-- `invalid_session_token`
-- `expired_session_token`
 - `inactive_user`
 - `user_not_found`
 
@@ -83,7 +85,14 @@ Request:
 ```json
 {
 	"payload": {
-		"session_token": "msess_example",
+		"current_user": {
+			"user_id": 1,
+			"email": "user@example.com",
+			"role": "user",
+			"is_active": true,
+			"api_access_enabled": true,
+			"session_expires_at": "2026-05-04T12:00:00Z"
+		},
 		"payload": {
 			"pseudo": "new-pseudo",
 			"pp_id": 2
@@ -94,7 +103,6 @@ Request:
 
 Behavior:
 
-- resolves session via `auth_service`
 - normalizes pseudo if present
 - rejects empty/invalid pseudo values
 - rejects duplicate pseudo conflicts
@@ -103,7 +111,7 @@ Common error codes:
 
 - `invalid_pseudo`
 - `pseudo_already_registered`
-- session-related errors listed above
+- `inactive_user`
 
 ### `PATCH /internal/users/account/password`
 
@@ -114,7 +122,14 @@ Request:
 ```json
 {
 	"payload": {
-		"session_token": "msess_example",
+		"current_user": {
+			"user_id": 1,
+			"email": "user@example.com",
+			"role": "user",
+			"is_active": true,
+			"api_access_enabled": true,
+			"session_expires_at": "2026-05-04T12:00:00Z"
+		},
 		"payload": {
 			"current_password": "current-password",
 			"new_password": "new-super-secure-password"
@@ -125,7 +140,6 @@ Request:
 
 Behavior:
 
-- resolves session via `auth_service`
 - verifies current password hash
 - validates password policy
 - updates password hash
@@ -135,21 +149,13 @@ Common error codes:
 
 - `invalid_current_password`
 - `weak_password`
-- session-related errors listed above
+- `inactive_user`
 
-### `POST /internal/users/account/api-keys/list`
+### `GET /internal/users/account/api-keys`
 
 Lists active non-revoked API keys for the authenticated user.
 
-Request:
-
-```json
-{
-	"payload": {
-		"session_token": "msess_example"
-	}
-}
-```
+Request context is carried in internal `x-manifeed-acting-user-*` headers.
 
 ### `POST /internal/users/account/api-keys`
 
@@ -160,7 +166,14 @@ Request:
 ```json
 {
 	"payload": {
-		"session_token": "msess_example",
+		"current_user": {
+			"user_id": 1,
+			"email": "user@example.com",
+			"role": "user",
+			"is_active": true,
+			"api_access_enabled": true,
+			"session_expires_at": "2026-05-04T12:00:00Z"
+		},
 		"payload": {
 			"label": "desktop-worker",
 			"worker_type": "rss_scrapper"
@@ -171,7 +184,6 @@ Request:
 
 Behavior:
 
-- resolves session via `auth_service`
 - requires `api_access_enabled == true`
 - allocates next worker number per user/worker type
 - retries retryable integrity conflicts with nested transactions
@@ -181,21 +193,13 @@ Common error codes:
 
 - `api_access_disabled`
 - `api_key_allocation_failed`
-- session-related errors listed above
+- `inactive_user`
 
-### `POST /internal/users/account/api-keys/{api_key_id}/delete`
+### `DELETE /internal/users/account/api-keys/{api_key_id}`
 
 Revokes one active API key for the authenticated user.
 
-Request:
-
-```json
-{
-	"payload": {
-		"session_token": "msess_example"
-	}
-}
-```
+Request context is carried in internal `x-manifeed-acting-user-*` headers.
 
 Response:
 
@@ -209,34 +213,12 @@ Response:
 
 All admin endpoints are under `/internal/users/admin/users`.
 
-### `POST /internal/users/admin/users/list`
+### `GET /internal/users/admin/users`
 
 Lists users for admin tooling.
 
-Request:
-
-```json
-{
-	"payload": {
-		"current_user": {
-			"user_id": 2,
-			"email": "admin@example.com",
-			"role": "admin",
-			"is_active": true,
-			"api_access_enabled": true,
-			"session_expires_at": "2026-05-04T12:00:00Z"
-		},
-		"filters": {
-			"role": "user",
-			"is_active": true,
-			"api_access_enabled": false,
-			"search": "alice",
-			"limit": 50,
-			"offset": 0
-		}
-	}
-}
-```
+Request context is carried in internal `x-manifeed-acting-user-*` headers.
+Filters are query parameters.
 
 Behavior:
 
@@ -288,15 +270,14 @@ Common error codes:
 ### Account Read Flow
 
 1. validate internal token
-2. validate wrapped session-token payload
-3. resolve session through `auth_service`
-4. load user by resolved `user_id`
+2. validate wrapped current-user payload from `public_api`
+3. load user by `current_user.user_id`
 5. return account projection
 
 ### Account Password Change Flow
 
 1. validate internal token
-2. resolve session through `auth_service`
+2. validate wrapped current-user payload from `public_api`
 3. verify current password
 4. validate new password policy
 5. update password hash

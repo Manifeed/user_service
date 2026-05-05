@@ -9,17 +9,10 @@ import app.routers.internal_user_router as router_module
 
 from shared_backend.domain.current_user import AuthenticatedUserContext
 from shared_backend.errors.custom_exceptions import AdminAccessRequiredError
-from shared_backend.errors.custom_exceptions import InvalidSessionTokenError
 from shared_backend.errors.exception_handlers import register_exception_handlers
 from shared_backend.schemas.account.account_schema import AccountMeRead, UserApiKeyListRead
 from shared_backend.schemas.admin.admin_user_schema import AdminUserListRead, AdminUserRead
 from shared_backend.schemas.auth.auth_schema import AuthenticatedUserRead
-def _session_headers() -> dict[str, str]:
-    return {
-        router_module.INTERNAL_SESSION_TOKEN_HEADER: "msess_example",
-    }
-
-
 def _admin_headers(*, role: str = "admin") -> dict[str, str]:
     return {
         router_module.INTERNAL_CURRENT_USER_ID_HEADER: "2",
@@ -28,6 +21,30 @@ def _admin_headers(*, role: str = "admin") -> dict[str, str]:
         router_module.INTERNAL_CURRENT_USER_IS_ACTIVE_HEADER: "true",
         router_module.INTERNAL_CURRENT_USER_API_ACCESS_ENABLED_HEADER: "true",
         router_module.INTERNAL_CURRENT_USER_SESSION_EXPIRES_AT_HEADER: datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _current_user_headers(*, api_access_enabled: bool = True) -> dict[str, str]:
+    return {
+        router_module.INTERNAL_CURRENT_USER_ID_HEADER: "1",
+        router_module.INTERNAL_CURRENT_USER_EMAIL_HEADER: "user@example.com",
+        router_module.INTERNAL_CURRENT_USER_ROLE_HEADER: "user",
+        router_module.INTERNAL_CURRENT_USER_IS_ACTIVE_HEADER: "true",
+        router_module.INTERNAL_CURRENT_USER_API_ACCESS_ENABLED_HEADER: (
+            "true" if api_access_enabled else "false"
+        ),
+        router_module.INTERNAL_CURRENT_USER_SESSION_EXPIRES_AT_HEADER: datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _current_user_payload(*, api_access_enabled: bool = True) -> dict[str, object]:
+    return {
+        "user_id": 1,
+        "email": "user@example.com",
+        "role": "user",
+        "is_active": True,
+        "api_access_enabled": api_access_enabled,
+        "session_expires_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -70,11 +87,6 @@ def _build_client(monkeypatch) -> TestClient:
     user = _user_read()
     monkeypatch.setattr(
         router_module,
-        "resolve_authenticated_user_context",
-        lambda *, session_token: _current_user(),
-    )
-    monkeypatch.setattr(
-        router_module,
         "read_account_me",
         lambda db, *, current_user: AccountMeRead(user=user),
     )
@@ -114,7 +126,7 @@ def _build_client(monkeypatch) -> TestClient:
     return TestClient(app)
 
 
-def test_internal_account_api_key_routes_require_session_header(monkeypatch) -> None:
+def test_internal_account_api_key_routes_require_current_user_headers(monkeypatch) -> None:
     client = _build_client(monkeypatch)
 
     requests = [
@@ -127,7 +139,7 @@ def test_internal_account_api_key_routes_require_session_header(monkeypatch) -> 
         assert response.status_code == 422, path
 
 
-def test_internal_account_api_key_routes_accept_session_header(monkeypatch) -> None:
+def test_internal_account_api_key_routes_accept_current_user_headers(monkeypatch) -> None:
     client = _build_client(monkeypatch)
 
     requests = [
@@ -136,25 +148,19 @@ def test_internal_account_api_key_routes_accept_session_header(monkeypatch) -> N
     ]
 
     for method, path in requests:
-        response = client.request(method, path, headers=_session_headers())
+        response = client.request(method, path, headers=_current_user_headers())
         assert response.status_code == 200, path
 
 
-def test_internal_account_routes_surface_invalid_session_errors(monkeypatch) -> None:
+def test_internal_account_routes_use_supplied_current_user_without_auth_lookup(monkeypatch) -> None:
     client = _build_client(monkeypatch)
-    monkeypatch.setattr(
-        router_module,
-        "resolve_authenticated_user_context",
-        lambda *, session_token: (_ for _ in ()).throw(InvalidSessionTokenError()),
-    )
 
     response = client.post(
         "/internal/users/account/me",
-        json={"payload": {"session_token": "msess_invalid"}},
+        json={"payload": {"current_user": _current_user_payload()}},
     )
 
-    assert response.status_code == 401
-    assert response.json()["code"] == "invalid_session_token"
+    assert response.status_code == 200
 
 
 def test_internal_admin_routes_reject_non_admin_users(monkeypatch) -> None:

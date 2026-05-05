@@ -6,13 +6,9 @@
 - `ENVIRONMENT`: fallback environment selector
 - `IDENTITY_DATABASE_URL`: PostgreSQL DSN for identity database
 - `REQUIRE_EXPLICIT_DATABASE_URLS`: forces explicit DB URL in strict envs
-- `AUTH_SERVICE_URL`: internal base URL for `auth_service`
-- `AUTH_SERVICE_TIMEOUT_SECONDS`
-	- default: `5`
-	- invalid/non-positive values fallback to default in shared service-client helpers
 - `INTERNAL_SERVICE_TOKEN`: shared internal secret
+  - required at startup, minimum 32 characters
 - `INTERNAL_SERVICE_TOKENS`: optional comma-separated accepted ingress tokens
-- `REQUIRE_INTERNAL_SERVICE_TOKEN`: strict token requirement toggle
 
 ## Database Pool Variables
 
@@ -35,4 +31,5 @@
 ## Configuration Notes
 
 - local/test environments may fallback to the built-in local identity DB URL when strict explicit-URL mode is off
-- `/internal/ready` now depends on `AUTH_SERVICE_URL` being configured because account flows revalidate through `auth_service`
+- `/internal/ready` validates internal token configuration and identity DB connectivity
+- account flows receive a current-user context from `public_api`; `user_service` no longer requires `AUTH_SERVICE_URL`

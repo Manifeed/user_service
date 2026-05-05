@@ -23,7 +23,7 @@ clients.
 - Build worker-facing API key projections (`worker_name`, visible prefix)
 - List users with admin filters and pagination
 - Update admin-managed user flags
-- Revalidate account requests through `auth_service`
+- Consume account current-user context resolved by `public_api`
 - Enforce internal service token authorization
 - Expose health/readiness probes for orchestrators
 - Emit shared request logs and shared JSON error payloads
@@ -33,4 +33,4 @@ clients.
 - FastAPI
 - SQLAlchemy + psycopg + PostgreSQL
 - `manifeed-shared-backend` for shared schemas/domain/errors
-- `auth_service` for session resolution on account flows
+- `public_api` for session resolution before account calls
