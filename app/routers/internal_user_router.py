@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Header, Path, Query
 from sqlalchemy.orm import Session
 
-from app.database import get_identity_db_session
+from app.database import get_identity_read_db_session, get_identity_write_db_session
 from app.services.account_api_key_service import (
     create_account_api_key,
     delete_account_api_key,
@@ -61,7 +61,7 @@ internal_user_router = APIRouter(
 @internal_user_router.post("/account/me", response_model=AccountMeRead)
 def read_internal_account_me(
     payload: Annotated[InternalAccountMeRequest, Body(embed=True)],
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_read_db_session),
 ) -> AccountMeRead:
     return read_account_me(
         db,
@@ -72,7 +72,7 @@ def read_internal_account_me(
 @internal_user_router.patch("/account/me", response_model=AccountProfileUpdateRead)
 def update_internal_account_me(
     payload: Annotated[InternalAccountProfileUpdateRequest, Body(embed=True)],
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_write_db_session),
 ) -> AccountProfileUpdateRead:
     return update_account_profile(
         db,
@@ -84,7 +84,7 @@ def update_internal_account_me(
 @internal_user_router.patch("/account/password", response_model=AccountPasswordUpdateRead)
 def update_internal_account_password(
     payload: Annotated[InternalAccountPasswordUpdateRequest, Body(embed=True)],
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_write_db_session),
 ) -> AccountPasswordUpdateRead:
     return update_account_password(
         db,
@@ -101,7 +101,7 @@ def read_internal_account_api_keys(
     current_user_is_active: Annotated[bool, Header(alias=INTERNAL_CURRENT_USER_IS_ACTIVE_HEADER)],
     current_user_api_access_enabled: Annotated[bool, Header(alias=INTERNAL_CURRENT_USER_API_ACCESS_ENABLED_HEADER)],
     current_user_session_expires_at: Annotated[str, Header(alias=INTERNAL_CURRENT_USER_SESSION_EXPIRES_AT_HEADER)],
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_read_db_session),
 ) -> UserApiKeyListRead:
     current_user = _read_current_user_from_headers(
         user_id=current_user_id,
@@ -120,7 +120,7 @@ def read_internal_account_api_keys(
 @internal_user_router.post("/account/api-keys", response_model=UserApiKeyCreateRead)
 def create_internal_account_api_key(
     payload: Annotated[InternalApiKeyCreateRequest, Body(embed=True)],
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_write_db_session),
 ) -> UserApiKeyCreateRead:
     return create_account_api_key(
         db,
@@ -138,7 +138,7 @@ def delete_internal_account_api_key(
     current_user_api_access_enabled: Annotated[bool, Header(alias=INTERNAL_CURRENT_USER_API_ACCESS_ENABLED_HEADER)],
     current_user_session_expires_at: Annotated[str, Header(alias=INTERNAL_CURRENT_USER_SESSION_EXPIRES_AT_HEADER)],
     api_key_id: int = Path(ge=1),
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_write_db_session),
 ) -> UserApiKeyDeleteRead:
     current_user = _read_current_user_from_headers(
         user_id=current_user_id,
@@ -169,7 +169,7 @@ def read_internal_admin_users(
     current_user_is_active: Annotated[bool, Header(alias=INTERNAL_CURRENT_USER_IS_ACTIVE_HEADER)] = False,
     current_user_api_access_enabled: Annotated[bool, Header(alias=INTERNAL_CURRENT_USER_API_ACCESS_ENABLED_HEADER)] = False,
     current_user_session_expires_at: Annotated[str, Header(alias=INTERNAL_CURRENT_USER_SESSION_EXPIRES_AT_HEADER)] = "",
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_read_db_session),
 ) -> AdminUserListRead:
     current_user = _read_current_user_from_headers(
         user_id=current_user_id,
@@ -195,7 +195,7 @@ def read_internal_admin_users(
 def update_internal_admin_user(
     payload: Annotated[InternalAdminUserUpdateRequest, Body(embed=True)],
     user_id: int = Path(ge=1),
-    db: Session = Depends(get_identity_db_session),
+    db: Session = Depends(get_identity_write_db_session),
 ) -> AdminUserRead:
     return update_admin_user(
         db,

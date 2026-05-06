@@ -1,79 +1,42 @@
 from __future__ import annotations
 
-import os
 from typing import Generator
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
-DEFAULT_DB_POOL_SIZE = 20
-DEFAULT_DB_MAX_OVERFLOW = 40
-DEFAULT_DB_POOL_TIMEOUT_SECONDS = 30
-DEFAULT_DB_POOL_RECYCLE_SECONDS = 1800
-
-
-def _read_int_env(name: str, default: int, *, minimum: int | None = None) -> int:
-    raw_value = os.getenv(name, str(default)).strip()
-    try:
-        parsed = int(raw_value)
-    except ValueError:
-        return default
-    if minimum is not None and parsed < minimum:
-        return default
-    return parsed
-
-
-DB_POOL_SIZE = _read_int_env("DB_POOL_SIZE", DEFAULT_DB_POOL_SIZE, minimum=1)
-DB_MAX_OVERFLOW = _read_int_env("DB_MAX_OVERFLOW", DEFAULT_DB_MAX_OVERFLOW, minimum=0)
-DB_POOL_TIMEOUT_SECONDS = _read_int_env(
-    "DB_POOL_TIMEOUT_SECONDS",
-    DEFAULT_DB_POOL_TIMEOUT_SECONDS,
-    minimum=1,
-)
-DB_POOL_RECYCLE_SECONDS = _read_int_env(
-    "DB_POOL_RECYCLE_SECONDS",
-    DEFAULT_DB_POOL_RECYCLE_SECONDS,
-    minimum=1,
+from shared_backend.database import (
+    check_database_ready,
+    configure_database_access,
+    get_db_session as shared_get_db_session,
 )
 
-def _resolve_database_url() -> str:
-    database_url = os.getenv("IDENTITY_DATABASE_URL")
-    if not database_url or not database_url.strip():
-        raise RuntimeError("IDENTITY_DATABASE_URL must be configured")
-    database_url = database_url.strip()
-    if database_url.startswith("postgresql://") and "+psycopg" not in database_url:
-        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return database_url
+_IDENTITY_DATABASE = configure_database_access(
+    write_env="IDENTITY_WRITE_DATABASE_URL",
+    read_env="IDENTITY_READ_DATABASE_URL",
+    write_fallback_env_names=("IDENTITY_DATABASE_URL",),
+    read_fallback_env_names=("IDENTITY_DATABASE_URL",),
+)
+
+IDENTITY_READ_DATABASE_URL = _IDENTITY_DATABASE.read_url
+IDENTITY_WRITE_DATABASE_URL = _IDENTITY_DATABASE.write_url
+IDENTITY_DATABASE_URL = IDENTITY_WRITE_DATABASE_URL
+
+identity_read_engine = _IDENTITY_DATABASE.read_engine
+IdentityReadSessionLocal = _IDENTITY_DATABASE.read_session_factory
+IdentityWriteSessionLocal = _IDENTITY_DATABASE.write_session_factory
 
 
-def _create_engine(database_url: str):
-    return create_engine(
-        database_url,
-        pool_pre_ping=True,
-        pool_size=DB_POOL_SIZE,
-        max_overflow=DB_MAX_OVERFLOW,
-        pool_timeout=DB_POOL_TIMEOUT_SECONDS,
-        pool_recycle=DB_POOL_RECYCLE_SECONDS,
-    )
+def get_identity_read_db_session() -> Generator[Session, None, None]:
+    yield from shared_get_db_session(IdentityReadSessionLocal)
 
 
-IDENTITY_DATABASE_URL = _resolve_database_url()
-identity_engine = _create_engine(IDENTITY_DATABASE_URL)
-IdentitySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=identity_engine)
+def get_identity_write_db_session() -> Generator[Session, None, None]:
+    yield from shared_get_db_session(IdentityWriteSessionLocal)
 
 
-def open_identity_db_session() -> Session:
-    return IdentitySessionLocal()
-
-
-def get_identity_db_session() -> Generator[Session, None, None]:
-    db = open_identity_db_session()
-    try:
-        yield db
-    finally:
-        db.close()
+def check_identity_read_database_ready() -> None:
+    check_database_ready(identity_read_engine)
 
 
 def check_identity_database_ready() -> None:
-    with IdentitySessionLocal() as db:
-        db.execute(text("SELECT 1")).scalar_one()
+    check_identity_read_database_ready()
