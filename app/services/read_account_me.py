@@ -3,12 +3,12 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.clients.database import identity_database_client
-from app.domain.current_user import (
+from shared_backend.domain.current_user import (
     AuthenticatedUserContext,
     build_authenticated_user_read,
 )
-from shared_backend.errors.custom_exceptions import UserNotFoundError
 
+from shared_backend.errors.custom_exceptions import UserNotFoundError
 from shared_backend.schemas.account.account_schema import AccountMeRead
 
 

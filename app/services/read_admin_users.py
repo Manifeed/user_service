@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.clients.database.identity_database_client import UserRecord
 from app.clients.database import identity_database_client
+from app.services.current_user_context_service import ensure_admin_user
 
+from shared_backend.domain.current_user import AuthenticatedUserContext
 from shared_backend.schemas.admin.admin_user_schema import AdminUserListRead, AdminUserRead
 from shared_backend.schemas.auth.auth_schema import UserRole
 
@@ -12,6 +14,7 @@ from shared_backend.schemas.auth.auth_schema import UserRole
 def read_admin_users(
     db: Session,
     *,
+    current_user: AuthenticatedUserContext,
     role: UserRole | None = None,
     is_active: bool | None = None,
     api_access_enabled: bool | None = None,
@@ -19,6 +22,7 @@ def read_admin_users(
     limit: int = 100,
     offset: int = 0,
 ) -> AdminUserListRead:
+    ensure_admin_user(current_user)
     normalized_search = search.strip() if search is not None else None
     effective_search = normalized_search or None
     effective_is_active = is_active
